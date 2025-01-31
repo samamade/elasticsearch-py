@@ -1,25 +1,43 @@
-[[installation]]
-== Installation
+from flask import Flask, request, render_template
+from elasticsearch import Elasticsearch
 
-**https://www.elastic.co/downloads/elasticsearch[Download the latest version of Elasticsearch]**
-or
-**https://cloud.elastic.co/registration?elektra=en-ess-sign-up-page[sign-up]**
-**for a free trial of Elastic Cloud**.
+app = Flask(__name__)
 
-The Python client for {es} can be installed with pip:
+# الاتصال بـ Elasticsearch
+es = Elasticsearch("http://localhost:9200")
 
-[source,sh]
--------------------------------------
-$ python -m pip install elasticsearch
--------------------------------------
+# إنشاء فهرس جديد (إذا لم يكن موجودًا)
+def create_index():
+    if not es.indices.exists(index="sama1_index"):
+        es.indices.create(index="sama1_index", ignore=400)
 
-If your application uses async/await in Python you can install with the `async` 
-extra:
+create_index()
 
-[source,sh]
---------------------------------------------
-$ python -m pip install elasticsearch[async]
---------------------------------------------
+# الصفحة الرئيسية لواجهة البحث
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-Read more about 
-https://elasticsearch-py.readthedocs.io/en/master/async.html[how to use asyncio with this project].
+# معالج الاستعلامات
+@app.route('/search', methods=['GET'])
+def search():
+    query = request.args.get('query')
+    
+    # استعلام Elasticsearch
+    if query:
+        res = es.search(index="sama1_index", body={
+            "query": {
+                "match": {
+                    "content": query
+                }
+            }
+        })
+        results = res['hits']['hits']
+    else:
+        results = []
+    
+    return render_template('index.html', query=query, results=results)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
